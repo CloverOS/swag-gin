@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/CloverOS/swag-gin"
 	"go/format"
 	"io"
 	"log"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/go-openapi/spec"
-	"github.com/swaggo/swag"
 )
 
 var open = os.Open

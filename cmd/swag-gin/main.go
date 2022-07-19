@@ -2,16 +2,15 @@ package main
 
 import (
 	"fmt"
+	"github.com/CloverOS/swag-gin"
+	"github.com/CloverOS/swag-gin/gen"
+	"github.com/swaggo/swag/format"
 	"io/ioutil"
 	"log"
 	"os"
 	"strings"
 
 	"github.com/urfave/cli/v2"
-
-	"github.com/swaggo/swag"
-	"github.com/swaggo/swag/format"
-	"github.com/swaggo/swag/gen"
 )
 
 const (

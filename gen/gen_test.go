@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/CloverOS/swag-gin"
 	"io/ioutil"
 	"log"
 	"os"
@@ -18,7 +19,6 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/swaggo/swag"
 )
 
 const searchDir = "../testdata/simple"

@@ -13,7 +13,7 @@ GOPATH:=$(shell $(GOCMD) env GOPATH)
 u := $(if $(update),-u)
 
 BINARY_NAME:=swag
-PACKAGES:=$(shell $(GOLIST) github.com/swaggo/swag github.com/swaggo/swag/cmd/swag github.com/swaggo/swag/gen github.com/swaggo/swag/format)
+PACKAGES:=$(shell $(GOLIST) github.com/swaggo/swag github.com/CloverOS/swag-gin/cmd/swag-gin github.com/swaggo/swag/gen github.com/swaggo/swag/format)
 GOFILES:=$(shell find . -name "*.go" -type f)
 
 export GO111MODULE := on
@@ -22,11 +22,11 @@ all: test build
 
 .PHONY: build
 build: deps
-	$(GOBUILD) -o $(BINARY_NAME) ./cmd/swag
+	$(GOBUILD) -o $(BINARY_NAME) ./cmd/swag-gin
 
 .PHONY: install
 install: deps
-	$(GOINSTALL) ./cmd/swag
+	$(GOINSTALL) ./cmd/swag-gin
 
 .PHONY: test
 test:
@@ -61,6 +61,7 @@ deps:
 	$(GOGET) github.com/go-openapi/spec
 	$(GOGET) github.com/stretchr/testify/assert
 	$(GOGET) golang.org/x/tools/go/loader
+	$(GOGET) github.com/Xuanwo/gg
 
 .PHONY: devel-deps
 devel-deps:

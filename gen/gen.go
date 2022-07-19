@@ -113,6 +113,15 @@ type Config struct {
 
 	// ParseGoList whether swag use go list to parse dependency
 	ParseGoList bool
+
+	// AutoRegisterGinRouter auto register router with gin web framework
+	AutoRegisterGinRouter bool
+
+	// GinServerPackage for AutoRegisterGinRouter gen code
+	GinServerPackage string
+
+	// GinRouterPath for AutoRegisterGinRouter gen code
+	GinRouterPath string
 }
 
 // Build builds swagger json file  for given searchDir and mainAPIFile. Returns json.
@@ -168,6 +177,15 @@ func (g *Gen) Build(config *Config) error {
 		return err
 	}
 
+	if config.AutoRegisterGinRouter {
+		err := swag.GinRouter.RegisterRouter(p, swag.GenConfig{
+			GinServerPackage: config.GinServerPackage,
+			GinRouterPath:    config.GinRouterPath,
+		})
+		if err != nil {
+			return err
+		}
+	}
 	swagger := p.GetSwagger()
 
 	if err := os.MkdirAll(config.OutputDir, os.ModePerm); err != nil {

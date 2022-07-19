@@ -10,6 +10,7 @@ import (
 // @Summary Add a new pet to the store
 // @Description get string by ID
 // @ID get-string-by-int
+// @Tags testmodel
 // @Accept  json
 // @Produce  json
 // @Param   some_id      path   int     true  "Some ID" Format(int64)

@@ -159,6 +159,9 @@ type Parser struct {
 
 	// parseGoList whether swag use go list to parse dependency
 	parseGoList bool
+
+	//  HandlerFunc for register router to gin web framework
+	HandlerFunc map[string]string
 }
 
 // FieldParserFactory create FieldParser.
@@ -214,6 +217,7 @@ func New(options ...func(*Parser)) *Parser {
 		excludes:           make(map[string]struct{}),
 		fieldParserFactory: newTagBaseFieldParser,
 		Overrides:          make(map[string]string),
+		HandlerFunc:        make(map[string]string),
 	}
 
 	for _, option := range options {
@@ -779,9 +783,51 @@ func isExistsScope(scope string) (bool, error) {
 
 // ParseRouterAPIInfo parses router api info for given astFile.
 func (parser *Parser) ParseRouterAPIInfo(fileName string, astFile *ast.File) error {
+	pkgName := astFile.Name.Name
+	values := make(map[string]string)
 	for _, astDescription := range astFile.Decls {
+		astGenDeclaration, ok := astDescription.(*ast.GenDecl)
+		if ok && astGenDeclaration.Specs != nil {
+			for _, v := range astGenDeclaration.Specs {
+				valueSpec, o := v.(*ast.ValueSpec)
+				if o {
+					var fieldName string
+					for _, v1 := range valueSpec.Names {
+						fieldName = v1.Name
+					}
+					for _, v2 := range valueSpec.Values {
+						callExpr, k := v2.(*ast.CallExpr)
+						if k {
+							for _, v3 := range callExpr.Args {
+								ident, j := v3.(*ast.Ident)
+								if j && fieldName != "" {
+									values[fieldName] = ident.Name
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 		astDeclaration, ok := astDescription.(*ast.FuncDecl)
 		if ok && astDeclaration.Doc != nil && astDeclaration.Doc.List != nil {
+			var handlerFunName string
+			if astDeclaration.Recv != nil {
+				if len(astDeclaration.Recv.List) > 0 {
+					startExpr, o := astDeclaration.Recv.List[0].Type.(*ast.StarExpr)
+					if o {
+						ident, k := startExpr.X.(*ast.Ident)
+						if k {
+							for s, s2 := range values {
+								if s2 == ident.Name {
+									handlerFunName = pkgName + "." + s + "." + astDeclaration.Name.Name
+									break
+								}
+							}
+						}
+					}
+				}
+			}
 			// for per 'function' comment, create a new 'Operation' object
 			operation := NewOperation(parser, SetCodeExampleFilesDirectory(parser.codeExampleFilesDir))
 			for _, comment := range astDeclaration.Doc.List {
@@ -790,8 +836,10 @@ func (parser *Parser) ParseRouterAPIInfo(fileName string, astFile *ast.File) err
 					return fmt.Errorf("ParseComment error in file %s :%+v", fileName, err)
 				}
 			}
-
-			err := processRouterOperation(parser, operation)
+			if handlerFunName == "" {
+				handlerFunName = pkgName + "." + astDeclaration.Name.Name
+			}
+			err := processRouterOperation(parser, operation, handlerFunName)
 			if err != nil {
 				return err
 			}
@@ -822,12 +870,16 @@ func refRouteMethodOp(item *spec.PathItem, method string) (op **spec.Operation) 
 	return
 }
 
-func processRouterOperation(parser *Parser, operation *Operation) error {
+func processRouterOperation(parser *Parser, operation *Operation, funcName string) error {
 	for _, routeProperties := range operation.RouterProperties {
 		var (
 			pathItem spec.PathItem
 			ok       bool
 		)
+
+		if funcName != "" {
+			parser.HandlerFunc[routeProperties.Path] = funcName
+		}
 
 		pathItem, ok = parser.swagger.Paths.Paths[routeProperties.Path]
 		if !ok {

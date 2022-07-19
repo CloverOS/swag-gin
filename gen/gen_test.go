@@ -27,11 +27,14 @@ var outputTypes = []string{"go", "json", "yaml"}
 
 func TestGen_Build(t *testing.T) {
 	config := &Config{
-		SearchDir:          searchDir,
-		MainAPIFile:        "./main.go",
-		OutputDir:          "../testdata/simple/docs",
-		OutputTypes:        outputTypes,
-		PropNamingStrategy: "",
+		SearchDir:             searchDir,
+		MainAPIFile:           "./main.go",
+		OutputDir:             "../testdata/simple/docs",
+		OutputTypes:           outputTypes,
+		PropNamingStrategy:    "",
+		AutoRegisterGinRouter: true,
+		GinRouterPath:         "../testdata/simple/router.go",
+		GinServerPackage:      "simple",
 	}
 	assert.NoError(t, New().Build(config))
 

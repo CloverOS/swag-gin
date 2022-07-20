@@ -890,7 +890,7 @@ func processRouterOperation(parser *Parser, operation *Operation, funcName strin
 			temp := strings.Split(fileName, string(filepath.Separator))
 			var realPath string
 			parser.FilePathHandlerFunc[routeProperties.Path] = strings.Replace(fileName, temp[len(temp)-2]+string(filepath.Separator)+temp[len(temp)-1], realPath, 1)
-			parser.PkgName[routeProperties.Path] = temp[len(temp)-3]
+			parser.PkgName[routeProperties.Path] = strings.Replace(temp[len(temp)-3], "-", "_", -1)
 		}
 
 		pathItem, ok = parser.swagger.Paths.Paths[routeProperties.Path]

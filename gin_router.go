@@ -3,6 +3,7 @@ package swag
 import (
 	"github.com/Xuanwo/gg"
 	"github.com/go-openapi/spec"
+	"path/filepath"
 )
 
 type router struct {
@@ -20,6 +21,11 @@ type RouteGroup struct {
 	GroupName string `json:"name"`
 }
 
+type Routes struct {
+	FilePath string
+	PkgName  string
+}
+
 type GenConfig struct {
 	GinServerPackage string
 	GinRouterPath    string
@@ -30,7 +36,7 @@ var GinRouter = new(router)
 func (*router) RegisterRouter(p *Parser, g GenConfig) error {
 	swagger := p.GetSwagger()
 	basePath := swagger.BasePath
-	routes := make(map[string][]RouteInfos)
+	routes := make(map[Routes][]RouteInfos)
 	for path, v := range swagger.SwaggerProps.Paths.Paths {
 		method, operation := getRoute(v)
 		groupName := "unknown"
@@ -46,19 +52,25 @@ func (*router) RegisterRouter(p *Parser, g GenConfig) error {
 				GroupName: groupName,
 			},
 		}
-		routes[groupName] = append(routes[groupName], route)
+		routes[Routes{
+			FilePath: p.FilePathHandlerFunc[path],
+			PkgName:  p.PkgName[path],
+		}] = append(routes[Routes{
+			FilePath: p.FilePathHandlerFunc[path],
+			PkgName:  p.PkgName[path],
+		}], route)
 	}
-	return createFile(routes, g)
+	return createFile(routes, g, p)
 }
 
-func createFile(routes map[string][]RouteInfos, config GenConfig) error {
-	g := gg.New()
-	f := g.NewGroup()
-	f.AddPackage(config.GinServerPackage)
-	f.NewImport().
-		AddPath("github.com/gin-gonic/gin")
-	functions := f.NewFunction("Register").AddParameter("r", "*gin.RouterGroup")
-	for _, infos := range routes {
+func createFile(routes map[Routes][]RouteInfos, config GenConfig, p *Parser) error {
+	for filePath, infos := range routes {
+		g := gg.New()
+		f := g.NewGroup()
+		f.AddPackage(filePath.PkgName)
+		f.NewImport().
+			AddPath("github.com/gin-gonic/gin")
+		functions := f.NewFunction("Register").AddParameter("r", "*gin.RouterGroup")
 		for _, v := range infos {
 			if v.Method == "get" {
 				functions.AddBody(gg.String(`r.GET(%s,%s)`, "\""+v.Path+"\"", v.HandlerFun))
@@ -82,10 +94,10 @@ func createFile(routes map[string][]RouteInfos, config GenConfig) error {
 				functions.AddBody(gg.String(`r.PATCH(%s,%s)`, "\""+v.Path+"\"", v.HandlerFun))
 			}
 		}
-	}
-	err := g.WriteFile(config.GinRouterPath)
-	if err != nil {
-		return err
+		err := g.WriteFile(filePath.FilePath + string(filepath.Separator) + "router.go")
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

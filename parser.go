@@ -162,6 +162,12 @@ type Parser struct {
 
 	//  HandlerFunc for register router to gin web framework
 	HandlerFunc map[string]string
+
+	// FilePathHandlerFunc
+	FilePathHandlerFunc map[string]string
+
+	//PkgName
+	PkgName map[string]string
 }
 
 // FieldParserFactory create FieldParser.
@@ -208,16 +214,18 @@ func New(options ...func(*Parser)) *Parser {
 				Extensions: nil,
 			},
 		},
-		packages:           NewPackagesDefinitions(),
-		debug:              log.New(os.Stdout, "", log.LstdFlags),
-		parsedSchemas:      make(map[*TypeSpecDef]*Schema),
-		outputSchemas:      make(map[*TypeSpecDef]*Schema),
-		existSchemaNames:   make(map[string]*Schema),
-		toBeRenamedSchemas: make(map[string]string),
-		excludes:           make(map[string]struct{}),
-		fieldParserFactory: newTagBaseFieldParser,
-		Overrides:          make(map[string]string),
-		HandlerFunc:        make(map[string]string),
+		packages:            NewPackagesDefinitions(),
+		debug:               log.New(os.Stdout, "", log.LstdFlags),
+		parsedSchemas:       make(map[*TypeSpecDef]*Schema),
+		outputSchemas:       make(map[*TypeSpecDef]*Schema),
+		existSchemaNames:    make(map[string]*Schema),
+		toBeRenamedSchemas:  make(map[string]string),
+		excludes:            make(map[string]struct{}),
+		fieldParserFactory:  newTagBaseFieldParser,
+		Overrides:           make(map[string]string),
+		HandlerFunc:         make(map[string]string),
+		FilePathHandlerFunc: make(map[string]string),
+		PkgName:             make(map[string]string),
 	}
 
 	for _, option := range options {
@@ -839,7 +847,7 @@ func (parser *Parser) ParseRouterAPIInfo(fileName string, astFile *ast.File) err
 			if handlerFunName == "" {
 				handlerFunName = pkgName + "." + astDeclaration.Name.Name
 			}
-			err := processRouterOperation(parser, operation, handlerFunName)
+			err := processRouterOperation(parser, operation, handlerFunName, fileName)
 			if err != nil {
 				return err
 			}
@@ -870,7 +878,7 @@ func refRouteMethodOp(item *spec.PathItem, method string) (op **spec.Operation) 
 	return
 }
 
-func processRouterOperation(parser *Parser, operation *Operation, funcName string) error {
+func processRouterOperation(parser *Parser, operation *Operation, funcName string, fileName string) error {
 	for _, routeProperties := range operation.RouterProperties {
 		var (
 			pathItem spec.PathItem
@@ -879,6 +887,10 @@ func processRouterOperation(parser *Parser, operation *Operation, funcName strin
 
 		if funcName != "" {
 			parser.HandlerFunc[routeProperties.Path] = funcName
+			temp := strings.Split(fileName, string(filepath.Separator))
+			var realPath string
+			parser.FilePathHandlerFunc[routeProperties.Path] = strings.Replace(fileName, temp[len(temp)-2]+string(filepath.Separator)+temp[len(temp)-1], realPath, 1)
+			parser.PkgName[routeProperties.Path] = temp[len(temp)-3]
 		}
 
 		pathItem, ok = parser.swagger.Paths.Paths[routeProperties.Path]

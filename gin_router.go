@@ -3,6 +3,7 @@ package swag
 import (
 	"github.com/Xuanwo/gg"
 	"github.com/go-openapi/spec"
+	"os"
 	"path/filepath"
 )
 
@@ -94,9 +95,15 @@ func createFile(routes map[Routes][]RouteInfos, config GenConfig, p *Parser) err
 				functions.AddBody(gg.String(`r.PATCH(%s,%s)`, "\""+v.Path+"\"", v.HandlerFun))
 			}
 		}
-		err := g.WriteFile(filePath.FilePath + string(filepath.Separator) + "router.go")
+		exists, err := pathExists(filePath.FilePath + string(filepath.Separator) + "router.go")
 		if err != nil {
 			return err
+		}
+		if !exists {
+			err = g.WriteFile(filePath.FilePath + string(filepath.Separator) + "router.go")
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -125,4 +132,15 @@ func getRoute(pathItem spec.PathItem) (string, *spec.Operation) {
 		return "patch", pathItem.Patch
 	}
 	return "unknown", nil
+}
+
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }

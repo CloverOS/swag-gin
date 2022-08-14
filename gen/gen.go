@@ -208,7 +208,9 @@ func (g *Gen) Build(config *Config) error {
 	}
 
 	if config.AutoRegisterGinRouter {
-		err := swag.GinRouter.RegisterRouter(p, swag.GenConfig{OutputDir: config.OutputDir})
+		err := swag.GinRouter.RegisterRouter(p, swag.GenConfig{
+			AutoCover: config.AutoCoverOld,
+			OutputDir: config.OutputDir})
 		if err != nil {
 			return err
 		}

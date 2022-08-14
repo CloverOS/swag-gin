@@ -34,7 +34,8 @@ type Routes struct {
 }
 
 type GenConfig struct {
-	OutputDir string
+	AutoCover bool   //自动覆盖
+	OutputDir string //输出文件夹
 }
 
 var GinRouter = new(router)
@@ -72,7 +73,7 @@ func (*router) RegisterRouter(p *Parser, g GenConfig) error {
 	if err != nil {
 		return err
 	}
-	return genGoFile(routes)
+	return genGoFile(routes, g)
 }
 
 func genDocFile(routes map[Routes][]RouteInfos, config GenConfig) error {
@@ -111,7 +112,7 @@ func genDocFile(routes map[Routes][]RouteInfos, config GenConfig) error {
 	if err != nil {
 		return err
 	}
-	if !exists {
+	if !exists || config.AutoCover {
 		file, err := os.Create(resource)
 		if err != nil {
 			return err
@@ -124,7 +125,7 @@ func genDocFile(routes map[Routes][]RouteInfos, config GenConfig) error {
 	return nil
 }
 
-func genGoFile(routes map[Routes][]RouteInfos) error {
+func genGoFile(routes map[Routes][]RouteInfos, config GenConfig) error {
 	for filePath, infos := range routes {
 		finalPath := filepath.Join(filePath.FilePath, "router.go")
 		f := jen.NewFilePath(filePath.PkgName)
@@ -200,7 +201,7 @@ func genGoFile(routes map[Routes][]RouteInfos) error {
 		if err != nil {
 			return err
 		}
-		if !exists {
+		if !exists || config.AutoCover {
 			file, err := os.Create(finalPath)
 			if err != nil {
 				return err

@@ -104,6 +104,10 @@ OPTIONS:
    --instanceName value                   This parameter can be used to name different swagger document instances. It is optional.
    --overridesFile value                  File to read global type overrides from. (default: ".swaggo")
    --help, -h                             show help (default: false)
+   --autoRegisterGinRouter true\false,--ag Auto register router to gin web framework
+   --autoCoverOld true\falses,--aco   	  Whether to overwrite the generated routing file
+   --ginServerPackage value, --pkg  	  Router file package for gin web
+   --ginRouterPath value, --rp            Path for gen code file
 ```
 
 ```bash

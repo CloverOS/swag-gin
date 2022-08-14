@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/CloverOS/swag-gin"
 	"go/format"
 	"io"
 	"log"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/go-openapi/spec"
-	"github.com/swaggo/swag"
 )
 
 var open = os.Open
@@ -120,6 +120,18 @@ type Config struct {
 
 	// ParseGoList whether swag use go list to parse dependency
 	ParseGoList bool
+
+	// AutoRegisterGinRouter auto register router with gin web framework
+	AutoRegisterGinRouter bool
+
+	// Auto cover old code
+	AutoCoverOld bool
+
+	// GinServerPackage for AutoRegisterGinRouter gen code
+	GinServerPackage string
+
+	// GinRouterPath for AutoRegisterGinRouter gen code
+	GinRouterPath string
 }
 
 // Build builds swagger json file  for given searchDir and mainAPIFile. Returns json.
@@ -195,6 +207,12 @@ func (g *Gen) Build(config *Config) error {
 		}
 	}
 
+	if config.AutoRegisterGinRouter {
+		err := swag.GinRouter.RegisterRouter(p, swag.GenConfig{OutputDir: config.OutputDir})
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

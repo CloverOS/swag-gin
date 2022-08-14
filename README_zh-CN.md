@@ -99,6 +99,10 @@ OPTIONS:
    --parseInternal                        解析 internal 包中的go文件，默认禁用
    --parseDepth value                     依赖解析深度 (默认: 100)
    --instanceName value                   设置文档实例名 (默认: "swagger")
+   --autoRegisterGinRouter true\false,--ag 是否开启自动生成路由注册文件
+   --autoCoverOld true\falses,--aco       是否覆盖已生成的路由文件
+   --ginServerPackage value, --pkg  	  路由注册文件的包名
+   --ginRouterPath value, --rp            路由注册文件的生成路径
 ```
 
 ```bash

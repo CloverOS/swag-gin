@@ -51,14 +51,15 @@ Swag converts Go annotations to Swagger Documentation 2.0. We've created a varie
 
 2. Download swag by using:
 ```sh
-$ go get -u github.com/swaggo/swag/cmd/swag
+$ go get -u github.com/CloverOS/swag-gin/cmd/swag-gin
 
 # 1.16 or newer
-$ go install github.com/swaggo/swag/cmd/swag@latest
+$ go install github.com/CloverOS/swag-gin/cmd/swag-gin@latest
 ```
+
 To build from source you need [Go](https://golang.org/dl/) (1.15 or newer).
 
-Or download a pre-compiled binary from the [release page](https://github.com/swaggo/swag/releases).
+Or download a pre-compiled binary from the [release page](https://github.com/CloverOS/swag-gin/releases).
 
 3. Run `swag init` in the project's root folder which contains the `main.go` file. This will parse your comments and generate the required files (`docs` folder and `docs/docs.go`).
 ```sh

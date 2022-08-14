@@ -13,7 +13,7 @@ GOPATH:=$(shell $(GOCMD) env GOPATH)
 u := $(if $(update),-u)
 
 BINARY_NAME:=swag
-PACKAGES:=$(shell $(GOLIST) github.com/swaggo/swag github.com/swaggo/swag/cmd/swag github.com/swaggo/swag/gen github.com/swaggo/swag/format)
+PACKAGES:=$(shell $(GOLIST) github.com/swaggo/swag github.com/swaggo/swag/cmd/swag github.com/CloverOS/swag-gin/cmd/swag-gin github.com/CloverOS/swag-gin/gen github.com/swaggo/swag/format)
 GOFILES:=$(shell find . -name "*.go" -type f)
 
 export GO111MODULE := on
@@ -22,11 +22,11 @@ all: test build
 
 .PHONY: build
 build: deps
-	$(GOBUILD) -o $(BINARY_NAME) ./cmd/swag
+	$(GOBUILD) -o $(BINARY_NAME) ./cmd/swag-gin
 
 .PHONY: install
 install: deps
-	$(GOINSTALL) ./cmd/swag
+	$(GOINSTALL) ./cmd/swag-gin
 
 .PHONY: test
 test:

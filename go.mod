@@ -14,8 +14,6 @@ require (
 	golang.org/x/tools v0.1.10
 )
 
-replace github.com/swaggo/swag v1.8.4 => github.com/CloverOS/swag-gin v1.8.4-gin.0.20220815071738-2152d63749e8
-
 require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect

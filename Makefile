@@ -12,8 +12,8 @@ GOVET:=$(GOCMD) vet
 GOPATH:=$(shell $(GOCMD) env GOPATH)
 u := $(if $(update),-u)
 
-BINARY_NAME:=swag
-PACKAGES:=$(shell $(GOLIST) github.com/swaggo/swag github.com/swaggo/swag/cmd/swag github.com/CloverOS/swag-gin/cmd/swag-gin github.com/CloverOS/swag-gin/gen github.com/swaggo/swag/format)
+BINARY_NAME:=swag-gin
+PACKAGES:=$(shell $(GOLIST) github.com/CloverOS/swag-gin github.com/CloverOS/swag-gin/cmd/swag-gin github.com/CloverOS/swag-gin/gen github.com/CloverOS/swag-gin/format)
 GOFILES:=$(shell find . -name "*.go" -type f)
 
 export GO111MODULE := on

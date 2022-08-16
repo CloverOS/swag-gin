@@ -144,6 +144,7 @@ func genGoFile(routes map[Routes][]RouteInfos, config GenConfig) error {
 				var temp string
 				handlerFuncName = strings.Replace(v.HandlerFun, prefix+".", temp, 1)
 			}
+			packageName = strings.Replace(packageName, "\\", "/", -1)
 			f.ImportName(packageName, prefix)
 			if err != nil {
 				return err

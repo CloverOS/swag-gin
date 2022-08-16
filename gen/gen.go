@@ -132,6 +132,9 @@ type Config struct {
 
 	// GinRouterPath for AutoRegisterGinRouter gen code
 	GinRouterPath string
+
+	// GinRouterTemplate for AutoRegisterGinRouterPath gen code
+	AutoRegisterGinRouterPathFlag bool
 }
 
 // Build builds swagger json file  for given searchDir and mainAPIFile. Returns json.
@@ -211,6 +214,18 @@ func (g *Gen) Build(config *Config) error {
 		err := swag.GinRouter.RegisterRouter(p, swag.GenConfig{
 			AutoCover: config.AutoCoverOld,
 			OutputDir: config.OutputDir})
+		if err != nil {
+			return err
+		}
+	}
+	if config.AutoRegisterGinRouterPathFlag {
+		if config.GinServerPackage == "" {
+			config.GinServerPackage = "routers"
+		}
+		err := swag.GinRouter.RegisterRouterPath(p, swag.GenConfig{
+			AutoCover: config.AutoCoverOld,
+			OutputDir: config.OutputDir,
+			OutputPkg: config.GinServerPackage})
 		if err != nil {
 			return err
 		}

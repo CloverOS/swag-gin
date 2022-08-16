@@ -1,6 +1,7 @@
 package swag
 
 import (
+	"errors"
 	"fmt"
 	"github.com/dave/jennifer/jen"
 	"github.com/go-openapi/spec"
@@ -36,9 +37,183 @@ type Routes struct {
 type GenConfig struct {
 	AutoCover bool   //自动覆盖
 	OutputDir string //输出文件夹
+	OutputPkg string //输出包名
+}
+
+// IntRouterPath
+// @Description: 路由注册方法
+type IntRouterPath struct {
+	FilePath        string
+	PkgName         string
+	RouteModuleName string
+}
+
+// MyRouterPath 路由注册函数
+type MyRouterPath struct {
+	Method      string   `json:"method"`     //路由方法
+	Path        string   `json:"path"`       //路由路径
+	Fun         string   `json:"fun"`        //路由函数
+	Remarks     string   `json:"remarks"`    //备注(用于列表处理时显示)
+	Auth        bool     `json:"-"`          //需要授权
+	Allow       string   `json:"-"`          //访问限制
+	AuthHandler []string `json:"-"`          //中间件
+	MenuItems   string   `json:"menu_items"` // 菜单分类
 }
 
 var GinRouter = new(router)
+
+func (*router) RegisterRouterPath(p *Parser, g GenConfig) error {
+	swagger := p.GetSwagger()
+	route := make(map[IntRouterPath][]MyRouterPath)
+	for path, v := range swagger.SwaggerProps.Paths.Paths {
+		method, operation := getRoute(v)
+		var handler []string
+		if len(operation.Security) > 0 {
+			a := operation.Security[0]
+			for s, i := range a {
+				switch s {
+				case "auth":
+					handler = []string{"auth", "JwtAuthMiddleware()", "handler", "AuthCheckRole(util.GetE())"}
+				case "wx":
+					handler = []string{"auth", "WeiXinAuth()"}
+				default:
+					if len(i) > 0 {
+						handler = i
+					}
+				}
+			}
+		}
+		r := MyRouterPath{
+			Method:      method,
+			Path:        path,
+			Fun:         p.HandlerFunc[path],
+			Auth:        len(handler) >= 2,
+			AuthHandler: handler,
+			Remarks:     operation.Summary,
+			MenuItems:   operation.Tags[0],
+		}
+		route[IntRouterPath{
+			FilePath:        p.FilePathHandlerFunc[path],
+			PkgName:         p.PkgName[path],
+			RouteModuleName: p.HandlerFuncModules[path],
+		}] = append(route[IntRouterPath{
+			FilePath:        p.FilePathHandlerFunc[path],
+			PkgName:         p.PkgName[path],
+			RouteModuleName: p.HandlerFuncModules[path],
+		}], r)
+	}
+	err := genDocFilePath(route, g)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func genDocFilePath(routes map[IntRouterPath][]MyRouterPath, config GenConfig) error {
+	finalPath := strings.ReplaceAll(config.OutputDir, "/docs", "/"+config.OutputPkg)
+	exists, err := pathExists(finalPath)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		err := os.MkdirAll(finalPath, 0755)
+		if err != nil {
+			return err
+		}
+	}
+	f := jen.NewFilePath(finalPath)
+	f.ImportName("github.com/gin-gonic/gin", "")
+	f.Type().Id("IntRouterPath").Struct(
+		jen.Id("FilePath").String().Tag(map[string]string{"json": "file_path"}),
+		jen.Id("PkgName").String().Tag(map[string]string{"json": "pkg_name"}),
+		jen.Id("RouteModuleName").String().Tag(map[string]string{"json": "route_module_name"}),
+	)
+	f.Line()
+	f.Type().Id("MyRouterPath").Struct(
+		jen.Id("Method").String().Tag(map[string]string{"json": "method"}).Comment("请求方法"),
+		jen.Id("Path").String().Tag(map[string]string{"json": "path"}).Comment(" 路由路径"),
+		jen.Id("Fun").UnionFunc(func(group *jen.Group) {
+			group.Id("gin.HandlerFunc")
+		}).Tag(map[string]string{"json": "-"}).Comment(" 路由方法"),
+		jen.Id("Remarks").String().Tag(map[string]string{"json": "remarks"}).Comment(" 备注"),
+		jen.Id("Auth").Bool().Tag(map[string]string{"json": "auth"}).Comment(" 是否鉴权"),
+		jen.Id("AuthHandler").UnionFunc(func(group *jen.Group) {
+			group.Id("[]gin.HandlerFunc")
+		}).Tag(map[string]string{"json": "-"}).Comment(" 鉴权中间件"),
+		jen.Id("MenuItems").String().Tag(map[string]string{"json": "menu_items"}).Comment(" 菜单分类"),
+	)
+	var values []jen.Code
+	for filePath, infos := range routes {
+		for _, info := range infos {
+			packageName, err := GetPackageName(filePath.FilePath)
+			split := strings.Split(info.Fun, ".")
+			var handlerFuncName = info.Fun
+			prefix := ""
+			if len(split) > 1 {
+				prefix = split[0]
+				packageName = filepath.Join(packageName, prefix)
+				var temp string
+				handlerFuncName = strings.Replace(info.Fun, prefix+".", temp, 1)
+			}
+			packageName = strings.Replace(packageName, "\\", "/", -1)
+			f.ImportName(packageName, prefix)
+			if err != nil {
+				return err
+			}
+			if len(info.AuthHandler) > 0 {
+				if !isEven(len(info.AuthHandler)) {
+					return errors.New("鉴权设置异常，请检查Security字段")
+				}
+				f.ImportName("ShuHeSdk/util", "")
+				values = append(values, jen.Values(jen.Dict{
+					jen.Id("Method"):  jen.Lit(strings.ToTitle(info.Method)),
+					jen.Id("Path"):    jen.Lit(info.Path),
+					jen.Id("Fun"):     jen.Qual(packageName, handlerFuncName),
+					jen.Id("Remarks"): jen.Lit(info.Remarks),
+					jen.Id("Auth"):    jen.Lit(info.Auth),
+					jen.Id("AuthHandler"): jen.ListFunc(func(group *jen.Group) {
+						s := group.Id("[]gin.HandlerFunc")
+						var cs []jen.Code
+						for i, _ := range info.AuthHandler {
+							if isEven(i) || i == 0 {
+								cs = append(cs, jen.Qual(info.AuthHandler[i], info.AuthHandler[i+1]))
+							}
+						}
+						s.Values(cs...)
+					}),
+					jen.Id("MenuItems"): jen.Lit(info.MenuItems),
+				}))
+			} else {
+				values = append(values, jen.Values(jen.Dict{
+					jen.Id("Method"):    jen.Lit(strings.ToTitle(info.Method)),
+					jen.Id("Path"):      jen.Lit(info.Path),
+					jen.Id("Fun"):       jen.Qual(packageName, handlerFuncName),
+					jen.Id("Remarks"):   jen.Lit(info.Remarks),
+					jen.Id("Auth"):      jen.Lit(info.Auth),
+					jen.Id("MenuItems"): jen.Lit(info.MenuItems),
+				}))
+			}
+		}
+	}
+	f.Func().Id("IntRouterPaths").Params().Index().Id("MyRouterPath").Block(
+		jen.Return(jen.Index().Id("MyRouterPath").Values(values...)))
+	resource := filepath.Join(finalPath, "IntRouterPaths.go")
+	exists, err = pathExists(resource)
+	if err != nil {
+		return err
+	}
+	if !exists || config.AutoCover {
+		file, err := os.Create(resource)
+		if err != nil {
+			return err
+		}
+		err = f.Render(file)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func (*router) RegisterRouter(p *Parser, g GenConfig) error {
 	swagger := p.GetSwagger()
@@ -275,4 +450,11 @@ func GetPackageName(searchDir string) (string, error) {
 	outStr = f[0]
 
 	return outStr, nil
+}
+
+func isEven(num int) bool {
+	if num%2 == 0 {
+		return true
+	}
+	return false
 }

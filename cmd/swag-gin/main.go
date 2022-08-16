@@ -14,28 +14,29 @@ import (
 )
 
 const (
-	searchDirFlag             = "dir"
-	excludeFlag               = "exclude"
-	generalInfoFlag           = "generalInfo"
-	propertyStrategyFlag      = "propertyStrategy"
-	outputFlag                = "output"
-	outputTypesFlag           = "outputTypes"
-	parseVendorFlag           = "parseVendor"
-	parseDependencyFlag       = "parseDependency"
-	markdownFilesFlag         = "markdownFiles"
-	codeExampleFilesFlag      = "codeExampleFiles"
-	parseInternalFlag         = "parseInternal"
-	generatedTimeFlag         = "generatedTime"
-	requiredByDefaultFlag     = "requiredByDefault"
-	parseDepthFlag            = "parseDepth"
-	instanceNameFlag          = "instanceName"
-	overridesFileFlag         = "overridesFile"
-	parseGoListFlag           = "parseGoList"
-	autoRegisterGinRouterFlag = "autoRegisterGinRouter"
-	autoCoverOld              = "autoCoverOld"
-	ginServerPackageFlag      = "ginServerPackage"
-	ginRouterPathFlag         = "ginRouterPath"
-	quietFlag                 = "quiet"
+	searchDirFlag                 = "dir"
+	excludeFlag                   = "exclude"
+	generalInfoFlag               = "generalInfo"
+	propertyStrategyFlag          = "propertyStrategy"
+	outputFlag                    = "output"
+	outputTypesFlag               = "outputTypes"
+	parseVendorFlag               = "parseVendor"
+	parseDependencyFlag           = "parseDependency"
+	markdownFilesFlag             = "markdownFiles"
+	codeExampleFilesFlag          = "codeExampleFiles"
+	parseInternalFlag             = "parseInternal"
+	generatedTimeFlag             = "generatedTime"
+	requiredByDefaultFlag         = "requiredByDefault"
+	parseDepthFlag                = "parseDepth"
+	instanceNameFlag              = "instanceName"
+	overridesFileFlag             = "overridesFile"
+	parseGoListFlag               = "parseGoList"
+	autoRegisterGinRouterFlag     = "autoRegisterGinRouter"
+	autoRegisterGinRouterPathFlag = "autoRegisterGinRouterPath"
+	autoCoverOld                  = "autoCoverOld"
+	ginServerPackageFlag          = "ginServerPackage"
+	ginRouterPathFlag             = "ginRouterPath"
+	quietFlag                     = "quiet"
 )
 
 var initFlags = []cli.Flag{
@@ -137,6 +138,12 @@ var initFlags = []cli.Flag{
 		Value:   false,
 		Usage:   "Auto register router to gin web framework",
 	},
+	&cli.BoolFlag{
+		Name:    autoRegisterGinRouterPathFlag,
+		Aliases: []string{"agr"},
+		Value:   false,
+		Usage:   "Auto register router to gin web framework",
+	},
 	&cli.BoolFlag{Name: autoCoverOld,
 		Aliases: []string{"aco"},
 		Value:   false,
@@ -175,28 +182,29 @@ func initAction(ctx *cli.Context) error {
 	}
 
 	return gen.New().Build(&gen.Config{
-		SearchDir:             ctx.String(searchDirFlag),
-		Excludes:              ctx.String(excludeFlag),
-		MainAPIFile:           ctx.String(generalInfoFlag),
-		PropNamingStrategy:    strategy,
-		OutputDir:             ctx.String(outputFlag),
-		OutputTypes:           outputTypes,
-		ParseVendor:           ctx.Bool(parseVendorFlag),
-		ParseDependency:       ctx.Bool(parseDependencyFlag),
-		MarkdownFilesDir:      ctx.String(markdownFilesFlag),
-		ParseInternal:         ctx.Bool(parseInternalFlag),
-		GeneratedTime:         ctx.Bool(generatedTimeFlag),
-		RequiredByDefault:     ctx.Bool(requiredByDefaultFlag),
-		CodeExampleFilesDir:   ctx.String(codeExampleFilesFlag),
-		ParseDepth:            ctx.Int(parseDepthFlag),
-		InstanceName:          ctx.String(instanceNameFlag),
-		OverridesFile:         ctx.String(overridesFileFlag),
-		ParseGoList:           ctx.Bool(parseGoListFlag),
-		AutoRegisterGinRouter: ctx.Bool(autoRegisterGinRouterFlag),
-		AutoCoverOld:          ctx.Bool(autoCoverOld),
-		GinServerPackage:      ctx.String(ginServerPackageFlag),
-		GinRouterPath:         ctx.String(ginRouterPathFlag),
-		Debugger:              logger,
+		SearchDir:                     ctx.String(searchDirFlag),
+		Excludes:                      ctx.String(excludeFlag),
+		MainAPIFile:                   ctx.String(generalInfoFlag),
+		PropNamingStrategy:            strategy,
+		OutputDir:                     ctx.String(outputFlag),
+		OutputTypes:                   outputTypes,
+		ParseVendor:                   ctx.Bool(parseVendorFlag),
+		ParseDependency:               ctx.Bool(parseDependencyFlag),
+		MarkdownFilesDir:              ctx.String(markdownFilesFlag),
+		ParseInternal:                 ctx.Bool(parseInternalFlag),
+		GeneratedTime:                 ctx.Bool(generatedTimeFlag),
+		RequiredByDefault:             ctx.Bool(requiredByDefaultFlag),
+		CodeExampleFilesDir:           ctx.String(codeExampleFilesFlag),
+		ParseDepth:                    ctx.Int(parseDepthFlag),
+		InstanceName:                  ctx.String(instanceNameFlag),
+		OverridesFile:                 ctx.String(overridesFileFlag),
+		ParseGoList:                   ctx.Bool(parseGoListFlag),
+		AutoRegisterGinRouter:         ctx.Bool(autoRegisterGinRouterFlag),
+		AutoRegisterGinRouterPathFlag: ctx.Bool(autoRegisterGinRouterPathFlag),
+		AutoCoverOld:                  ctx.Bool(autoCoverOld),
+		GinServerPackage:              ctx.String(ginServerPackageFlag),
+		GinRouterPath:                 ctx.String(ginRouterPathFlag),
+		Debugger:                      logger,
 	})
 }
 

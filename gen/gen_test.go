@@ -54,6 +54,35 @@ func TestGen_Build(t *testing.T) {
 	//}
 }
 
+func TestGenPath_Build(t *testing.T) {
+	config := &Config{
+		SearchDir:                     searchDir,
+		MainAPIFile:                   "./main.go",
+		OutputDir:                     "../testdata/simple/docs",
+		OutputTypes:                   outputTypes,
+		PropNamingStrategy:            "",
+		AutoRegisterGinRouterPathFlag: true,
+		AutoCoverOld:                  true,
+		GinRouterPath:                 "../testdata/simple",
+		GinServerPackage:              "routers",
+	}
+	assert.NoError(t, New().Build(config))
+
+	//expectedFiles := []string{
+	//	filepath.Join(config.OutputDir, "docs.go"),
+	//	filepath.Join(config.OutputDir, "swagger.json"),
+	//	filepath.Join(config.OutputDir, "swagger.yaml"),
+	//	filepath.Join(config.OutputDir, "resource.go"),
+	//}
+	//for _, expectedFile := range expectedFiles {
+	//	if _, err := os.Stat(expectedFile); os.IsNotExist(err) {
+	//		require.NoError(t, err)
+	//	}
+	//
+	//	_ = os.Remove(expectedFile)
+	//}
+}
+
 func TestGen_SpecificOutputTypes(t *testing.T) {
 	config := &Config{
 		SearchDir:          searchDir,

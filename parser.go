@@ -1086,7 +1086,12 @@ func (parser *Parser) isInStructStack(typeSpecDef *TypeSpecDef) bool {
 // with a schema for the given type
 func (parser *Parser) ParseDefinition(typeSpecDef *TypeSpecDef) (*Schema, error) {
 	typeName := typeSpecDef.FullName()
-	refTypeName := TypeDocName(typeName, typeSpecDef.TypeSpec)
+	var refTypeName string
+	if fn, ok := (typeSpecDef.ParentSpec).(*ast.FuncDecl); ok {
+		refTypeName = TypeDocNameFuncScoped(typeName, typeSpecDef.TypeSpec, fn.Name.Name)
+	} else {
+		refTypeName = TypeDocName(typeName, typeSpecDef.TypeSpec)
+	}
 
 	schema, found := parser.parsedSchemas[typeSpecDef]
 	if found {
@@ -1138,6 +1143,14 @@ func (parser *Parser) ParseDefinition(typeSpecDef *TypeSpecDef) (*Schema, error)
 func fullTypeName(pkgName, typeName string) string {
 	if pkgName != "" && !ignoreNameOverride(typeName) {
 		return pkgName + "." + typeName
+	}
+
+	return typeName
+}
+
+func fullTypeNameFunctionScoped(pkgName, fnName, typeName string) string {
+	if pkgName != "" {
+		return pkgName + "." + fnName + "." + typeName
 	}
 
 	return typeName

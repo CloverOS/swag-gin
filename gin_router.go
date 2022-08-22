@@ -129,8 +129,8 @@ func genGoFile(routes map[Routes][]RouteInfos, config GenConfig) error {
 	for filePath, infos := range routes {
 		finalPath := filepath.Join(filePath.FilePath, "router.go")
 		f := jen.NewFilePath(filePath.PkgName)
-		f.ImportName("github.com/gin-gonic/gin", "")
-		rParams := jen.Id("r").Op("*").Id("gin").Dot("RouterGroup")
+		f.ImportName("github.com/gin-gonic/gin", "gin")
+		rParams := jen.Id("r").Op("*").Qual("github.com/gin-gonic/gin", "RouterGroup")
 		var publicCode []jen.Code
 		var privateCode []jen.Code
 		for _, v := range infos {

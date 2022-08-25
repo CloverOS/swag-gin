@@ -17,6 +17,7 @@ type router struct {
 type RouteInfos struct {
 	Method     string `json:"method"`      // method
 	Path       string `json:"path"`        //path
+	BasePath   string `json:"base_path"`   //basePath
 	HandlerFun string `json:"handler_fun"` //handlerFun
 	Summary    string `json:"summary"`     //Summary
 	Public     bool   `json:"public"`      //is public router
@@ -43,6 +44,7 @@ var GinRouter = new(router)
 func (*router) RegisterRouter(p *Parser, g GenConfig) error {
 	swagger := p.GetSwagger()
 	routes := make(map[Routes][]RouteInfos)
+
 	for path, v := range swagger.SwaggerProps.Paths.Paths {
 		method, operation := getRoute(v)
 		groupName := "unknown"
@@ -52,6 +54,7 @@ func (*router) RegisterRouter(p *Parser, g GenConfig) error {
 		route := RouteInfos{
 			Method:     method,
 			Path:       path,
+			BasePath:   swagger.BasePath,
 			HandlerFun: p.HandlerFunc[path],
 			Summary:    operation.Summary,
 			RouteGroup: RouteGroup{
@@ -85,6 +88,7 @@ func genDocFile(routes map[Routes][]RouteInfos, config GenConfig) error {
 	f.Type().Id("RouteInfos").Struct(
 		jen.Id("Method").String().Tag(map[string]string{"json": "method"}).Comment(" method"),
 		jen.Id("Path").String().Tag(map[string]string{"json": "path"}).Comment(" path"),
+		jen.Id("BasePath").String().Tag(map[string]string{"json": "base_path"}).Comment(" BasePath"),
 		jen.Id("HandlerFun").String().Tag(map[string]string{"json": "handler_fun"}).Comment(" handlerFun"),
 		jen.Id("Summary").String().Tag(map[string]string{"json": "summary"}).Comment(" Summary"),
 		jen.Id("Public").Bool().Tag(map[string]string{"json": "public"}).Comment(" is public router"),
@@ -96,6 +100,7 @@ func genDocFile(routes map[Routes][]RouteInfos, config GenConfig) error {
 			values = append(values, jen.Values(jen.Dict{
 				jen.Id("Method"):     jen.Lit(info.Method),
 				jen.Id("Path"):       jen.Lit(info.Path),
+				jen.Id("BasePath"):   jen.Lit(info.BasePath),
 				jen.Id("HandlerFun"): jen.Lit(info.HandlerFun),
 				jen.Id("Summary"):    jen.Lit(info.Summary),
 				jen.Id("Public"):     jen.Lit(info.Public),

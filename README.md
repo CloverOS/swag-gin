@@ -52,15 +52,11 @@ Swag converts Go annotations to Swagger Documentation 2.0. We've created a varie
 
 2. Download swag by using:
 ```sh
-$ go get -u github.com/CloverOS/swag-gin/cmd/swag-gin
-
-# 1.16 or newer
-$ go install github.com/CloverOS/swag-gin/cmd/swag-gin@latest
+$ go install github.com/swaggo/swag/cmd/swag@latest
 ```
+To build from source you need [Go](https://golang.org/dl/) (1.16 or newer).
 
-To build from source you need [Go](https://golang.org/dl/) (1.15 or newer).
-
-Or download a pre-compiled binary from the [release page](https://github.com/CloverOS/swag-gin/releases).
+Or download a pre-compiled binary from the [release page](https://github.com/swaggo/swag/releases).
 
 3. Run `swag init` in the project's root folder which contains the `main.go` file. This will parse your comments and generate the required files (`docs` folder and `docs/docs.go`).
 ```sh
@@ -106,10 +102,6 @@ OPTIONS:
    --instanceName value                   This parameter can be used to name different swagger document instances. It is optional.
    --overridesFile value                  File to read global type overrides from. (default: ".swaggo")
    --help, -h                             show help (default: false)
-   --autoRegisterGinRouter true\false,--ag Auto register router to gin web framework
-   --autoCoverOld true\falses,--aco   	  Whether to overwrite the generated routing file
-   --ginServerPackage value, --pkg  	  Router file package for gin web
-   --ginRouterPath value, --rp            Path for gen code file
 ```
 
 ```bash

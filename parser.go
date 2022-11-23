@@ -958,7 +958,7 @@ func (parser *Parser) getTypeSchema(typeName string, file *ast.File, ref bool) (
 		return PrimitiveSchema(schemaType), nil
 	}
 
-	typeSpecDef := parser.packages.FindTypeSpec(typeName, file, parser.ParseDependency)
+	typeSpecDef := parser.packages.FindTypeSpec(typeName, file)
 	if typeSpecDef == nil {
 		return nil, fmt.Errorf("cannot find type definition: %s", typeName)
 	}
@@ -1085,14 +1085,7 @@ func (parser *Parser) isInStructStack(typeSpecDef *TypeSpecDef) bool {
 // given name and package, and populates swagger schema definitions registry
 // with a schema for the given type
 func (parser *Parser) ParseDefinition(typeSpecDef *TypeSpecDef) (*Schema, error) {
-	typeName := typeSpecDef.FullName()
-	var refTypeName string
-	if fn, ok := (typeSpecDef.ParentSpec).(*ast.FuncDecl); ok {
-		refTypeName = TypeDocNameFuncScoped(typeName, typeSpecDef.TypeSpec, fn.Name.Name)
-	} else {
-		refTypeName = TypeDocName(typeName, typeSpecDef.TypeSpec)
-	}
-
+	typeName := typeSpecDef.TypeName()
 	schema, found := parser.parsedSchemas[typeSpecDef]
 	if found {
 		parser.debug.Printf("Skipping '%s', already parsed.", typeName)
@@ -1104,7 +1097,7 @@ func (parser *Parser) ParseDefinition(typeSpecDef *TypeSpecDef) (*Schema, error)
 		parser.debug.Printf("Skipping '%s', recursion detected.", typeName)
 
 		return &Schema{
-				Name:    refTypeName,
+				Name:    typeName,
 				PkgPath: typeSpecDef.PkgPath,
 				Schema:  PrimitiveSchema(OBJECT),
 			},
@@ -1124,8 +1117,27 @@ func (parser *Parser) ParseDefinition(typeSpecDef *TypeSpecDef) (*Schema, error)
 		fillDefinitionDescription(definition, typeSpecDef.File, typeSpecDef)
 	}
 
+	if len(typeSpecDef.Enums) > 0 {
+		var varnames []string
+		var enumComments = make(map[string]string)
+		for _, value := range typeSpecDef.Enums {
+			definition.Enum = append(definition.Enum, value.Value)
+			varnames = append(varnames, value.key)
+			if len(value.Comment) > 0 {
+				enumComments[value.key] = value.Comment
+			}
+		}
+		if definition.Extensions == nil {
+			definition.Extensions = make(spec.Extensions)
+		}
+		definition.Extensions[enumVarNamesExtension] = varnames
+		if len(enumComments) > 0 {
+			definition.Extensions[enumCommentsExtension] = enumComments
+		}
+	}
+
 	sch := Schema{
-		Name:    refTypeName,
+		Name:    typeName,
 		PkgPath: typeSpecDef.PkgPath,
 		Schema:  definition,
 	}
@@ -1140,12 +1152,8 @@ func (parser *Parser) ParseDefinition(typeSpecDef *TypeSpecDef) (*Schema, error)
 	return &sch, nil
 }
 
-func fullTypeName(pkgName, typeName string) string {
-	if pkgName != "" && !ignoreNameOverride(typeName) {
-		return pkgName + "." + typeName
-	}
-
-	return typeName
+func fullTypeName(parts ...string) string {
+	return strings.Join(parts, ".")
 }
 
 func fullTypeNameFunctionScoped(pkgName, fnName, typeName string) string {
@@ -1402,7 +1410,7 @@ func getFieldType(file *ast.File, field ast.Expr) (string, error) {
 
 		return fullName, nil
 	default:
-		return getGenericFieldType(file, field)
+		return getGenericFieldType(file, field, nil)
 	}
 }
 

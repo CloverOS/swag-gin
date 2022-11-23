@@ -146,8 +146,10 @@ func genGoFile(routes map[Routes][]RouteInfos, config GenConfig) error {
 			tempInfos[v.Path] = v
 		}
 		sort.Strings(sortPath)
-		for path, _ := range tempInfos {
-			v := tempInfos[path]
+		i := 0
+		for range tempInfos {
+			v := tempInfos[sortPath[i]]
+			i++
 			packageName, err := GetPackageName(filePath.FilePath)
 			split := strings.Split(v.HandlerFun, ".")
 			var handlerFuncName = v.HandlerFun

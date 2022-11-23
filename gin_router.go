@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -138,7 +139,15 @@ func genGoFile(routes map[Routes][]RouteInfos, config GenConfig) error {
 		rParams := jen.Id("r").Op("*").Qual("github.com/gin-gonic/gin", "RouterGroup")
 		var publicCode []jen.Code
 		var privateCode []jen.Code
+		var sortPath []string
+		tempInfos := make(map[string]RouteInfos)
 		for _, v := range infos {
+			sortPath = append(sortPath, v.Path)
+			tempInfos[v.Path] = v
+		}
+		sort.Strings(sortPath)
+		for path, _ := range tempInfos {
+			v := tempInfos[path]
 			packageName, err := GetPackageName(filePath.FilePath)
 			split := strings.Split(v.HandlerFun, ".")
 			var handlerFuncName = v.HandlerFun

@@ -11,6 +11,8 @@ type NestedResponse struct {
 	Post types.Field[[]types.Post]
 }
 
+type Audience[T any] []T
+
 type CreateMovie struct {
 	Name           string
 	MainActor      types.Field[Person]
@@ -18,6 +20,10 @@ type CreateMovie struct {
 	Directors      types.Field[*[]Person]
 	CameraPeople   types.Field[[]*Person]
 	Producer       types.Field[*Person]
+	Audience       Audience[Person]
+	AudienceNames  Audience[string]
+	Detail1        types.Field[types.Field[Person]]
+	Detail2        types.Field[types.Field[string]]
 }
 
 type Person struct {

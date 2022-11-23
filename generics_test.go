@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/ast"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -26,7 +26,7 @@ func TestParseGenericsBasic(t *testing.T) {
 	t.Parallel()
 
 	searchDir := "testdata/generics_basic"
-	expected, err := ioutil.ReadFile(filepath.Join(searchDir, "expected.json"))
+	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
 
 	p := New()
@@ -47,7 +47,7 @@ func TestParseGenericsArrays(t *testing.T) {
 	t.Parallel()
 
 	searchDir := "testdata/generics_arrays"
-	expected, err := ioutil.ReadFile(filepath.Join(searchDir, "expected.json"))
+	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
 
 	p := New()
@@ -62,7 +62,7 @@ func TestParseGenericsNested(t *testing.T) {
 	t.Parallel()
 
 	searchDir := "testdata/generics_nested"
-	expected, err := ioutil.ReadFile(filepath.Join(searchDir, "expected.json"))
+	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
 
 	p := New()
@@ -77,7 +77,7 @@ func TestParseGenericsProperty(t *testing.T) {
 	t.Parallel()
 
 	searchDir := "testdata/generics_property"
-	expected, err := ioutil.ReadFile(filepath.Join(searchDir, "expected.json"))
+	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
 
 	p := New()
@@ -92,7 +92,7 @@ func TestParseGenericsNames(t *testing.T) {
 	t.Parallel()
 
 	searchDir := "testdata/generics_names"
-	expected, err := ioutil.ReadFile(filepath.Join(searchDir, "expected.json"))
+	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
 	assert.NoError(t, err)
 
 	p := New()
@@ -103,99 +103,118 @@ func TestParseGenericsNames(t *testing.T) {
 	assert.Equal(t, string(expected), string(b))
 }
 
+func TestParseGenericsPackageAlias(t *testing.T) {
+	t.Parallel()
+
+	searchDir := "testdata/generics_package_alias/internal"
+	expected, err := os.ReadFile(filepath.Join(searchDir, "expected.json"))
+	assert.NoError(t, err)
+
+	p := New(SetParseDependency(true))
+	err = p.ParseAPI(searchDir, mainAPIFile, defaultParseDepth)
+	assert.NoError(t, err)
+	b, err := json.MarshalIndent(p.swagger, "", "    ")
+	assert.NoError(t, err)
+	assert.Equal(t, string(expected), string(b))
+}
+
 func TestParametrizeStruct(t *testing.T) {
 	pd := PackagesDefinitions{
-		packages: make(map[string]*PackageDefinitions),
+		packages:          make(map[string]*PackageDefinitions),
+		uniqueDefinitions: make(map[string]*TypeSpecDef),
 	}
 	// valid
-	typeSpec := pd.parametrizeStruct(
+	typeSpec := pd.parametrizeGenericType(
 		&ast.File{Name: &ast.Ident{Name: "test2"}},
 		&TypeSpecDef{
+			File: &ast.File{Name: &ast.Ident{Name: "test"}},
 			TypeSpec: &ast.TypeSpec{
 				Name:       &ast.Ident{Name: "Field"},
 				TypeParams: &ast.FieldList{List: []*ast.Field{{Names: []*ast.Ident{{Name: "T"}}}, {Names: []*ast.Ident{{Name: "T2"}}}}},
 				Type:       &ast.StructType{Struct: 100, Fields: &ast.FieldList{Opening: 101, Closing: 102}},
-			}}, "test.Field[string, []string]", false)
+			}}, "test.Field[string, []string]")
+	assert.NotNil(t, typeSpec)
 	assert.Equal(t, "$test.Field-string-array_string", typeSpec.Name())
+	assert.Equal(t, "test.Field-string-array_string", typeSpec.TypeName())
 
 	// definition contains one type params, but two type params are provided
-	typeSpec = pd.parametrizeStruct(
+	typeSpec = pd.parametrizeGenericType(
 		&ast.File{Name: &ast.Ident{Name: "test2"}},
 		&TypeSpecDef{
 			TypeSpec: &ast.TypeSpec{
 				Name:       &ast.Ident{Name: "Field"},
 				TypeParams: &ast.FieldList{List: []*ast.Field{{Names: []*ast.Ident{{Name: "T"}}}}},
 				Type:       &ast.StructType{Struct: 100, Fields: &ast.FieldList{Opening: 101, Closing: 102}},
-			}}, "test.Field[string, string]", false)
+			}}, "test.Field[string, string]")
 	assert.Nil(t, typeSpec)
 
 	// definition contains two type params, but only one is used
-	typeSpec = pd.parametrizeStruct(
+	typeSpec = pd.parametrizeGenericType(
 		&ast.File{Name: &ast.Ident{Name: "test2"}},
 		&TypeSpecDef{
 			TypeSpec: &ast.TypeSpec{
 				Name:       &ast.Ident{Name: "Field"},
 				TypeParams: &ast.FieldList{List: []*ast.Field{{Names: []*ast.Ident{{Name: "T"}}}, {Names: []*ast.Ident{{Name: "T2"}}}}},
 				Type:       &ast.StructType{Struct: 100, Fields: &ast.FieldList{Opening: 101, Closing: 102}},
-			}}, "test.Field[string]", false)
+			}}, "test.Field[string]")
 	assert.Nil(t, typeSpec)
 
 	// name is not a valid type name
-	typeSpec = pd.parametrizeStruct(
+	typeSpec = pd.parametrizeGenericType(
 		&ast.File{Name: &ast.Ident{Name: "test2"}},
 		&TypeSpecDef{
 			TypeSpec: &ast.TypeSpec{
 				Name:       &ast.Ident{Name: "Field"},
 				TypeParams: &ast.FieldList{List: []*ast.Field{{Names: []*ast.Ident{{Name: "T"}}}, {Names: []*ast.Ident{{Name: "T2"}}}}},
 				Type:       &ast.StructType{Struct: 100, Fields: &ast.FieldList{Opening: 101, Closing: 102}},
-			}}, "test.Field[string", false)
+			}}, "test.Field[string")
 	assert.Nil(t, typeSpec)
 
-	typeSpec = pd.parametrizeStruct(
+	typeSpec = pd.parametrizeGenericType(
 		&ast.File{Name: &ast.Ident{Name: "test2"}},
 		&TypeSpecDef{
 			TypeSpec: &ast.TypeSpec{
 				Name:       &ast.Ident{Name: "Field"},
 				TypeParams: &ast.FieldList{List: []*ast.Field{{Names: []*ast.Ident{{Name: "T"}}}, {Names: []*ast.Ident{{Name: "T2"}}}}},
 				Type:       &ast.StructType{Struct: 100, Fields: &ast.FieldList{Opening: 101, Closing: 102}},
-			}}, "test.Field[string, [string]", false)
+			}}, "test.Field[string, [string]")
 	assert.Nil(t, typeSpec)
 
-	typeSpec = pd.parametrizeStruct(
+	typeSpec = pd.parametrizeGenericType(
 		&ast.File{Name: &ast.Ident{Name: "test2"}},
 		&TypeSpecDef{
 			TypeSpec: &ast.TypeSpec{
 				Name:       &ast.Ident{Name: "Field"},
 				TypeParams: &ast.FieldList{List: []*ast.Field{{Names: []*ast.Ident{{Name: "T"}}}, {Names: []*ast.Ident{{Name: "T2"}}}}},
 				Type:       &ast.StructType{Struct: 100, Fields: &ast.FieldList{Opening: 101, Closing: 102}},
-			}}, "test.Field[string, ]string]", false)
+			}}, "test.Field[string, ]string]")
 	assert.Nil(t, typeSpec)
 }
 
-func TestSplitStructNames(t *testing.T) {
+func TestSplitGenericsTypeNames(t *testing.T) {
 	t.Parallel()
 
-	field, params := splitStructName("test.Field")
+	field, params := splitGenericsTypeName("test.Field")
 	assert.Empty(t, field)
 	assert.Nil(t, params)
 
-	field, params = splitStructName("test.Field]")
+	field, params = splitGenericsTypeName("test.Field]")
 	assert.Empty(t, field)
 	assert.Nil(t, params)
 
-	field, params = splitStructName("test.Field[string")
+	field, params = splitGenericsTypeName("test.Field[string")
 	assert.Empty(t, field)
 	assert.Nil(t, params)
 
-	field, params = splitStructName("test.Field[string] ")
+	field, params = splitGenericsTypeName("test.Field[string] ")
 	assert.Equal(t, "test.Field", field)
 	assert.Equal(t, []string{"string"}, params)
 
-	field, params = splitStructName("test.Field[string, []string]")
+	field, params = splitGenericsTypeName("test.Field[string, []string]")
 	assert.Equal(t, "test.Field", field)
 	assert.Equal(t, []string{"string", "[]string"}, params)
 
-	field, params = splitStructName("test.Field[test.Field[ string, []string] ]")
+	field, params = splitGenericsTypeName("test.Field[test.Field[ string, []string] ]")
 	assert.Equal(t, "test.Field", field)
 	assert.Equal(t, []string{"test.Field[string,[]string]"}, params)
 }

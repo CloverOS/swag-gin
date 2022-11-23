@@ -6,15 +6,12 @@ package swag
 import (
 	"errors"
 	"fmt"
-	"github.com/go-openapi/spec"
 	"go/ast"
 	"strings"
-	"sync"
 	"unicode"
-)
 
-var genericDefinitionsMutex = &sync.RWMutex{}
-var genericsDefinitions = map[*TypeSpecDef]map[string]*TypeSpecDef{}
+	"github.com/go-openapi/spec"
+)
 
 type genericTypeSpec struct {
 	ArrayDepth int
@@ -22,53 +19,19 @@ type genericTypeSpec struct {
 	Name       string
 }
 
-func (s *genericTypeSpec) Type() ast.Expr {
-	if s.TypeSpec != nil {
-		return &ast.SelectorExpr{
-			X:   &ast.Ident{Name: ""},
-			Sel: &ast.Ident{Name: s.Name},
-		}
+func (t *genericTypeSpec) TypeName() string {
+	if t.TypeSpec != nil {
+		return t.TypeSpec.TypeName()
 	}
-
-	return &ast.Ident{Name: s.Name}
+	return t.Name
 }
 
-func (s *genericTypeSpec) TypeDocName() string {
-	if s.TypeSpec != nil {
-		return strings.Replace(TypeDocName(s.TypeSpec.FullName(), s.TypeSpec.TypeSpec), "-", "_", -1)
+func (pkgDefs *PackagesDefinitions) parametrizeGenericType(file *ast.File, original *TypeSpecDef, fullGenericForm string) *TypeSpecDef {
+	if original == nil || original.TypeSpec.TypeParams == nil || len(original.TypeSpec.TypeParams.List) == 0 {
+		return original
 	}
 
-	return s.Name
-}
-
-func typeSpecFullName(typeSpecDef *TypeSpecDef) string {
-	fullName := typeSpecDef.FullName()
-
-	if typeSpecDef.TypeSpec.TypeParams != nil {
-		fullName = fullName + "["
-		for i, typeParam := range typeSpecDef.TypeSpec.TypeParams.List {
-			if i > 0 {
-				fullName = fullName + "-"
-			}
-
-			fullName = fullName + typeParam.Names[0].Name
-		}
-		fullName = fullName + "]"
-	}
-
-	return fullName
-}
-
-func (pkgDefs *PackagesDefinitions) parametrizeStruct(file *ast.File, original *TypeSpecDef, fullGenericForm string, parseDependency bool) *TypeSpecDef {
-	genericDefinitionsMutex.RLock()
-	tSpec, ok := genericsDefinitions[original][fullGenericForm]
-	genericDefinitionsMutex.RUnlock()
-	if ok {
-		return tSpec
-	}
-
-	pkgName := strings.Split(fullGenericForm, ".")[0]
-	genericTypeName, genericParams := splitStructName(fullGenericForm)
+	name, genericParams := splitGenericsTypeName(fullGenericForm)
 	if genericParams == nil {
 		return nil
 	}
@@ -88,96 +51,62 @@ func (pkgDefs *PackagesDefinitions) parametrizeStruct(file *ast.File, original *
 			arrayDepth++
 		}
 
-		tdef := pkgDefs.FindTypeSpec(genericParam, file, parseDependency)
-		if tdef != nil && !strings.Contains(genericParam, ".") {
-			genericParam = fullTypeName(file.Name.Name, genericParam)
+		typeDef := pkgDefs.FindTypeSpec(genericParam, file)
+		if typeDef != nil {
+			genericParam = typeDef.TypeName()
+			if _, ok := pkgDefs.uniqueDefinitions[genericParam]; !ok {
+				pkgDefs.uniqueDefinitions[genericParam] = typeDef
+			}
 		}
+
 		genericParamTypeDefs[original.TypeSpec.TypeParams.List[i].Names[0].Name] = &genericTypeSpec{
 			ArrayDepth: arrayDepth,
-			TypeSpec:   tdef,
+			TypeSpec:   typeDef,
 			Name:       genericParam,
 		}
+	}
+
+	name = fmt.Sprintf("%s%s-", string(IgnoreNameOverridePrefix), original.TypeName())
+	var nameParts []string
+	for _, def := range original.TypeSpec.TypeParams.List {
+		if specDef, ok := genericParamTypeDefs[def.Names[0].Name]; ok {
+			var prefix = ""
+			if specDef.ArrayDepth == 1 {
+				prefix = "array_"
+			} else if specDef.ArrayDepth > 1 {
+				prefix = fmt.Sprintf("array%d_", specDef.ArrayDepth)
+			}
+			nameParts = append(nameParts, prefix+specDef.TypeName())
+		}
+	}
+
+	name += strings.Replace(strings.Join(nameParts, "-"), ".", "_", -1)
+
+	if typeSpec, ok := pkgDefs.uniqueDefinitions[name]; ok {
+		return typeSpec
 	}
 
 	parametrizedTypeSpec := &TypeSpecDef{
 		File:    original.File,
 		PkgPath: original.PkgPath,
 		TypeSpec: &ast.TypeSpec{
-			Doc:     original.TypeSpec.Doc,
-			Comment: original.TypeSpec.Comment,
-			Assign:  original.TypeSpec.Assign,
+			Name: &ast.Ident{
+				Name:    name,
+				NamePos: original.TypeSpec.Name.NamePos,
+				Obj:     original.TypeSpec.Name.Obj,
+			},
+			Type:   pkgDefs.resolveGenericType(original.File, original.TypeSpec.Type, genericParamTypeDefs),
+			Doc:    original.TypeSpec.Doc,
+			Assign: original.TypeSpec.Assign,
 		},
 	}
+	pkgDefs.uniqueDefinitions[name] = parametrizedTypeSpec
 
-	ident := &ast.Ident{
-		NamePos: original.TypeSpec.Name.NamePos,
-		Obj:     original.TypeSpec.Name.Obj,
-	}
-
-	if strings.Contains(genericTypeName, ".") {
-		genericTypeName = strings.Split(genericTypeName, ".")[1]
-	}
-
-	var typeName = []string{TypeDocName(fullTypeName(pkgName, genericTypeName), parametrizedTypeSpec.TypeSpec)}
-
-	for _, def := range original.TypeSpec.TypeParams.List {
-		if specDef, ok := genericParamTypeDefs[def.Names[0].Name]; ok {
-			var prefix = ""
-			if specDef.ArrayDepth > 0 {
-				prefix = "array_"
-				if specDef.ArrayDepth > 1 {
-					prefix = fmt.Sprintf("array%d_", specDef.ArrayDepth)
-				}
-			}
-			typeName = append(typeName, prefix+specDef.TypeDocName())
-		}
-	}
-
-	ident.Name = strings.Join(typeName, "-")
-	ident.Name = strings.Replace(ident.Name, ".", "_", -1)
-	pkgNamePrefix := pkgName + "_"
-	if strings.HasPrefix(ident.Name, pkgNamePrefix) {
-		ident.Name = fullTypeName(pkgName, ident.Name[len(pkgNamePrefix):])
-	}
-	ident.Name = string(IgnoreNameOverridePrefix) + ident.Name
-
-	parametrizedTypeSpec.TypeSpec.Name = ident
-	origStructType := original.TypeSpec.Type.(*ast.StructType)
-
-	newStructTypeDef := &ast.StructType{
-		Struct:     origStructType.Struct,
-		Incomplete: origStructType.Incomplete,
-		Fields: &ast.FieldList{
-			Opening: origStructType.Fields.Opening,
-			Closing: origStructType.Fields.Closing,
-		},
-	}
-
-	for _, field := range origStructType.Fields.List {
-		newField := &ast.Field{
-			Doc:     field.Doc,
-			Names:   field.Names,
-			Tag:     field.Tag,
-			Comment: field.Comment,
-		}
-
-		newField.Type = resolveType(field.Type, field, genericParamTypeDefs)
-
-		newStructTypeDef.Fields.List = append(newStructTypeDef.Fields.List, newField)
-	}
-
-	genericDefinitionsMutex.Lock()
-	defer genericDefinitionsMutex.Unlock()
-	parametrizedTypeSpec.TypeSpec.Type = newStructTypeDef
-	if genericsDefinitions[original] == nil {
-		genericsDefinitions[original] = map[string]*TypeSpecDef{}
-	}
-	genericsDefinitions[original][fullGenericForm] = parametrizedTypeSpec
 	return parametrizedTypeSpec
 }
 
-// splitStructName splits a generic struct name in his parts
-func splitStructName(fullGenericForm string) (string, []string) {
+// splitGenericsTypeName splits a generic struct name in his parts
+func splitGenericsTypeName(fullGenericForm string) (string, []string) {
 	//remove all spaces character
 	fullGenericForm = strings.Map(func(r rune) rune {
 		if unicode.IsSpace(r) {
@@ -217,40 +146,103 @@ func splitStructName(fullGenericForm string) (string, []string) {
 	return genericTypeName, genericParams
 }
 
-func resolveType(expr ast.Expr, field *ast.Field, genericParamTypeDefs map[string]*genericTypeSpec) ast.Expr {
-	switch astExpr := expr.(type) {
-	case *ast.Ident:
-		if genTypeSpec, ok := genericParamTypeDefs[astExpr.Name]; ok {
-			if genTypeSpec.ArrayDepth > 0 {
-				genTypeSpec.ArrayDepth--
-				return &ast.ArrayType{Elt: resolveType(expr, field, genericParamTypeDefs)}
-			}
-			return genTypeSpec.Type()
-		}
-	case *ast.ArrayType:
-		return &ast.ArrayType{
-			Elt:    resolveType(astExpr.Elt, field, genericParamTypeDefs),
-			Len:    astExpr.Len,
-			Lbrack: astExpr.Lbrack,
+func (pkgDefs *PackagesDefinitions) getParametrizedType(genTypeSpec *genericTypeSpec) ast.Expr {
+	if genTypeSpec.TypeSpec != nil && strings.Contains(genTypeSpec.Name, ".") {
+		parts := strings.SplitN(genTypeSpec.Name, ".", 2)
+		return &ast.SelectorExpr{
+			X:   &ast.Ident{Name: parts[0]},
+			Sel: &ast.Ident{Name: parts[1]},
 		}
 	}
 
-	return field.Type
+	//a primitive type name or a type name in current package
+	return &ast.Ident{Name: genTypeSpec.Name}
 }
 
-func getExtendedGenericFieldType(file *ast.File, field ast.Expr) (string, error) {
+func (pkgDefs *PackagesDefinitions) resolveGenericType(file *ast.File, expr ast.Expr, genericParamTypeDefs map[string]*genericTypeSpec) ast.Expr {
+	switch astExpr := expr.(type) {
+	case *ast.Ident:
+		if genTypeSpec, ok := genericParamTypeDefs[astExpr.Name]; ok {
+			retType := pkgDefs.getParametrizedType(genTypeSpec)
+			for i := 0; i < genTypeSpec.ArrayDepth; i++ {
+				retType = &ast.ArrayType{Elt: retType}
+			}
+			return retType
+		}
+	case *ast.ArrayType:
+		return &ast.ArrayType{
+			Elt:    pkgDefs.resolveGenericType(file, astExpr.Elt, genericParamTypeDefs),
+			Len:    astExpr.Len,
+			Lbrack: astExpr.Lbrack,
+		}
+	case *ast.StarExpr:
+		return &ast.StarExpr{
+			Star: astExpr.Star,
+			X:    pkgDefs.resolveGenericType(file, astExpr.X, genericParamTypeDefs),
+		}
+	case *ast.IndexExpr, *ast.IndexListExpr:
+		fullGenericName, _ := getGenericFieldType(file, expr, genericParamTypeDefs)
+		typeDef := pkgDefs.FindTypeSpec(fullGenericName, file)
+		if typeDef != nil {
+			return typeDef.TypeSpec.Type
+		}
+	case *ast.StructType:
+		newStructTypeDef := &ast.StructType{
+			Struct:     astExpr.Struct,
+			Incomplete: astExpr.Incomplete,
+			Fields: &ast.FieldList{
+				Opening: astExpr.Fields.Opening,
+				Closing: astExpr.Fields.Closing,
+			},
+		}
+
+		for _, field := range astExpr.Fields.List {
+			newField := &ast.Field{
+				Type:    field.Type,
+				Doc:     field.Doc,
+				Names:   field.Names,
+				Tag:     field.Tag,
+				Comment: field.Comment,
+			}
+
+			newField.Type = pkgDefs.resolveGenericType(file, field.Type, genericParamTypeDefs)
+
+			newStructTypeDef.Fields.List = append(newStructTypeDef.Fields.List, newField)
+		}
+		return newStructTypeDef
+	}
+	return expr
+}
+
+func getExtendedGenericFieldType(file *ast.File, field ast.Expr, genericParamTypeDefs map[string]*genericTypeSpec) (string, error) {
 	switch fieldType := field.(type) {
 	case *ast.ArrayType:
-		fieldName, err := getExtendedGenericFieldType(file, fieldType.Elt)
+		fieldName, err := getExtendedGenericFieldType(file, fieldType.Elt, genericParamTypeDefs)
 		return "[]" + fieldName, err
 	case *ast.StarExpr:
-		return getExtendedGenericFieldType(file, fieldType.X)
+		return getExtendedGenericFieldType(file, fieldType.X, genericParamTypeDefs)
+	case *ast.Ident:
+		if genericParamTypeDefs != nil {
+			if typeSpec, ok := genericParamTypeDefs[fieldType.Name]; ok {
+				return typeSpec.Name, nil
+			}
+		}
+		if fieldType.Obj == nil {
+			return fieldType.Name, nil
+		}
+
+		tSpec := &TypeSpecDef{
+			File:     file,
+			TypeSpec: fieldType.Obj.Decl.(*ast.TypeSpec),
+			PkgPath:  file.Name.Name,
+		}
+		return tSpec.TypeName(), nil
 	default:
 		return getFieldType(file, field)
 	}
 }
 
-func getGenericFieldType(file *ast.File, field ast.Expr) (string, error) {
+func getGenericFieldType(file *ast.File, field ast.Expr, genericParamTypeDefs map[string]*genericTypeSpec) (string, error) {
 	var fullName string
 	var baseName string
 	var err error
@@ -263,7 +255,7 @@ func getGenericFieldType(file *ast.File, field ast.Expr) (string, error) {
 		fullName = baseName + "["
 
 		for _, index := range fieldType.Indices {
-			fieldName, err := getExtendedGenericFieldType(file, index)
+			fieldName, err := getExtendedGenericFieldType(file, index, genericParamTypeDefs)
 			if err != nil {
 				return "", err
 			}
@@ -278,7 +270,7 @@ func getGenericFieldType(file *ast.File, field ast.Expr) (string, error) {
 			return "", err
 		}
 
-		indexName, err := getExtendedGenericFieldType(file, fieldType.Index)
+		indexName, err := getExtendedGenericFieldType(file, fieldType.Index, genericParamTypeDefs)
 		if err != nil {
 			return "", err
 		}
@@ -302,27 +294,27 @@ func getGenericFieldType(file *ast.File, field ast.Expr) (string, error) {
 }
 
 func getGenericTypeName(file *ast.File, field ast.Expr) (string, error) {
-	switch indexType := field.(type) {
+	switch fieldType := field.(type) {
 	case *ast.Ident:
-		if indexType.Obj == nil {
-			return getFieldType(file, field)
+		if fieldType.Obj == nil {
+			return fieldType.Name, nil
 		}
 
 		tSpec := &TypeSpecDef{
 			File:     file,
-			TypeSpec: indexType.Obj.Decl.(*ast.TypeSpec),
+			TypeSpec: fieldType.Obj.Decl.(*ast.TypeSpec),
 			PkgPath:  file.Name.Name,
 		}
-		return tSpec.FullName(), nil
+		return tSpec.TypeName(), nil
 	case *ast.ArrayType:
 		tSpec := &TypeSpecDef{
 			File:     file,
-			TypeSpec: indexType.Elt.(*ast.Ident).Obj.Decl.(*ast.TypeSpec),
+			TypeSpec: fieldType.Elt.(*ast.Ident).Obj.Decl.(*ast.TypeSpec),
 			PkgPath:  file.Name.Name,
 		}
-		return tSpec.FullName(), nil
+		return tSpec.TypeName(), nil
 	case *ast.SelectorExpr:
-		return fmt.Sprintf("%s.%s", indexType.X.(*ast.Ident).Name, indexType.Sel.Name), nil
+		return fmt.Sprintf("%s.%s", fieldType.X.(*ast.Ident).Name, fieldType.Sel.Name), nil
 	}
 	return "", fmt.Errorf("unknown type %#v", field)
 }
@@ -339,10 +331,10 @@ func (parser *Parser) parseGenericTypeExpr(file *ast.File, typeExpr ast.Expr) (*
 	case *ast.MapType:
 	case *ast.FuncType:
 	case *ast.IndexExpr:
-		name, err := getExtendedGenericFieldType(file, expr)
+		name, err := getExtendedGenericFieldType(file, expr, nil)
 		if err == nil {
 			if schema, err := parser.getTypeSchema(name, file, false); err == nil {
-				return spec.MapProperty(schema), nil
+				return schema, nil
 			}
 		}
 

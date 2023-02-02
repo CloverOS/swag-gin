@@ -1,7 +1,6 @@
 package swag
 
 import (
-	"go/ast"
 	"testing"
 
 	"github.com/go-openapi/spec"
@@ -149,21 +148,4 @@ func TestIsInterfaceLike(t *testing.T) {
 	assert.Equal(t, IsInterfaceLike(ANY), true)
 
 	assert.Equal(t, IsInterfaceLike(STRING), false)
-}
-
-func TestTypeDocName(t *testing.T) {
-	t.Parallel()
-
-	expected := "a/package"
-	assert.Equal(t, expected, TypeDocName(expected, nil))
-
-	expected = "package.Model"
-	assert.Equal(t, expected, TypeDocName("package", &ast.TypeSpec{Name: &ast.Ident{Name: "Model"}}))
-
-	expected = "Model"
-	assert.Equal(t, expected, TypeDocName("package", &ast.TypeSpec{
-		Comment: &ast.CommentGroup{
-			List: []*ast.Comment{{Text: "// @name Model"}},
-		},
-	}))
 }

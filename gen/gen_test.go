@@ -33,6 +33,7 @@ func TestGen_Build(t *testing.T) {
 		OutputTypes:           outputTypes,
 		PropNamingStrategy:    "",
 		AutoRegisterGinRouter: true,
+		AutoCoverOld:          true,
 		GinRouterPath:         "../testdata/simple",
 		GinServerPackage:      "simple",
 	}
@@ -42,6 +43,7 @@ func TestGen_Build(t *testing.T) {
 	//	filepath.Join(config.OutputDir, "docs.go"),
 	//	filepath.Join(config.OutputDir, "swagger.json"),
 	//	filepath.Join(config.OutputDir, "swagger.yaml"),
+	//	filepath.Join(config.OutputDir, "resource.go"),
 	//}
 	//for _, expectedFile := range expectedFiles {
 	//	if _, err := os.Stat(expectedFile); os.IsNotExist(err) {

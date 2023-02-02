@@ -32,6 +32,7 @@ const (
 	overridesFileFlag         = "overridesFile"
 	parseGoListFlag           = "parseGoList"
 	autoRegisterGinRouterFlag = "autoRegisterGinRouter"
+	autoCoverOld              = "autoCoverOld"
 	ginServerPackageFlag      = "ginServerPackage"
 	ginRouterPathFlag         = "ginRouterPath"
 	quietFlag                 = "quiet"
@@ -136,6 +137,11 @@ var initFlags = []cli.Flag{
 		Value:   false,
 		Usage:   "Auto register router to gin web framework",
 	},
+	&cli.BoolFlag{Name: autoCoverOld,
+		Aliases: []string{"aco"},
+		Value:   false,
+		Usage:   "Auto cover old code if already gen code",
+	},
 	&cli.StringFlag{
 		Name:    ginServerPackageFlag,
 		Aliases: []string{"pkg"},
@@ -163,7 +169,7 @@ func initAction(ctx *cli.Context) error {
 	if len(outputTypes) == 0 {
 		return fmt.Errorf("no output types specified")
 	}
-	var logger swag.Debugger
+	logger := log.New(os.Stdout, "", log.LstdFlags)
 	if ctx.Bool(quietFlag) {
 		logger = log.New(ioutil.Discard, "", log.LstdFlags)
 	}
@@ -187,6 +193,7 @@ func initAction(ctx *cli.Context) error {
 		OverridesFile:         ctx.String(overridesFileFlag),
 		ParseGoList:           ctx.Bool(parseGoListFlag),
 		AutoRegisterGinRouter: ctx.Bool(autoRegisterGinRouterFlag),
+		AutoCoverOld:          ctx.Bool(autoCoverOld),
 		GinServerPackage:      ctx.String(ginServerPackageFlag),
 		GinRouterPath:         ctx.String(ginRouterPathFlag),
 		Debugger:              logger,

@@ -111,6 +111,51 @@ func TestPackagesDefinitions_ParseTypes(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestPackagesDefinitions_parseFunctionScopedTypesFromFile(t *testing.T) {
+	mainAST := &ast.File{
+		Name: &ast.Ident{Name: "main.go"},
+		Decls: []ast.Decl{
+			&ast.FuncDecl{
+				Name: ast.NewIdent("TestFuncDecl"),
+				Body: &ast.BlockStmt{
+					List: []ast.Stmt{
+						&ast.DeclStmt{
+							Decl: &ast.GenDecl{
+								Tok: token.TYPE,
+								Specs: []ast.Spec{
+									&ast.TypeSpec{
+										Name: ast.NewIdent("response"),
+										Type: ast.NewIdent("struct"),
+									},
+									&ast.TypeSpec{
+										Name: ast.NewIdent("stringResponse"),
+										Type: ast.NewIdent("string"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pd := PackagesDefinitions{
+		packages: make(map[string]*PackageDefinitions),
+	}
+
+	parsedSchema := make(map[*TypeSpecDef]*Schema)
+	pd.parseFunctionScopedTypesFromFile(mainAST, "main", parsedSchema)
+
+	assert.Len(t, parsedSchema, 1)
+
+	_, ok := pd.uniqueDefinitions["main.go.TestFuncDecl.response"]
+	assert.True(t, ok)
+
+	_, ok = pd.packages["main"].TypeDefinitions["main.go.TestFuncDecl.response"]
+	assert.True(t, ok)
+}
+
 func TestPackagesDefinitions_FindTypeSpec(t *testing.T) {
 	userDef := TypeSpecDef{
 		File: &ast.File{
@@ -128,12 +173,12 @@ func TestPackagesDefinitions_FindTypeSpec(t *testing.T) {
 	}
 
 	var nilDef *TypeSpecDef
-	assert.Equal(t, nilDef, pkg.FindTypeSpec("int", nil, false))
-	assert.Equal(t, nilDef, pkg.FindTypeSpec("bool", nil, false))
-	assert.Equal(t, nilDef, pkg.FindTypeSpec("string", nil, false))
+	assert.Equal(t, nilDef, pkg.FindTypeSpec("int", nil))
+	assert.Equal(t, nilDef, pkg.FindTypeSpec("bool", nil))
+	assert.Equal(t, nilDef, pkg.FindTypeSpec("string", nil))
 
-	assert.Equal(t, &userDef, pkg.FindTypeSpec("user.Model", nil, false))
-	assert.Equal(t, nilDef, pkg.FindTypeSpec("Model", nil, false))
+	assert.Equal(t, &userDef, pkg.FindTypeSpec("user.Model", nil))
+	assert.Equal(t, nilDef, pkg.FindTypeSpec("Model", nil))
 }
 
 func TestPackage_rangeFiles(t *testing.T) {

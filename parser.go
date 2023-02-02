@@ -163,6 +163,9 @@ type Parser struct {
 	//  HandlerFunc for register router to gin web framework
 	HandlerFunc map[string]string
 
+	// HandlerFuncModules
+	HandlerFuncModules map[string]string
+
 	// FilePathHandlerFunc
 	FilePathHandlerFunc map[string]string
 
@@ -225,6 +228,7 @@ func New(options ...func(*Parser)) *Parser {
 		Overrides:           make(map[string]string),
 		HandlerFunc:         make(map[string]string),
 		FilePathHandlerFunc: make(map[string]string),
+		HandlerFuncModules:  make(map[string]string),
 		PkgName:             make(map[string]string),
 	}
 
@@ -887,10 +891,12 @@ func processRouterOperation(parser *Parser, operation *Operation, funcName strin
 
 		if funcName != "" {
 			parser.HandlerFunc[routeProperties.Path] = funcName
+			api, _ := filepath.Split(filepath.Clean(fileName))
+			service, _ := filepath.Split(filepath.Clean(api))
 			temp := strings.Split(fileName, string(filepath.Separator))
-			var realPath string
-			parser.FilePathHandlerFunc[routeProperties.Path] = strings.Replace(fileName, temp[len(temp)-2]+string(filepath.Separator)+temp[len(temp)-1], realPath, 1)
+			parser.FilePathHandlerFunc[routeProperties.Path] = service
 			parser.PkgName[routeProperties.Path] = strings.Replace(temp[len(temp)-3], "-", "_", -1)
+			parser.HandlerFuncModules[routeProperties.Path] = api
 		}
 
 		pathItem, ok = parser.swagger.Paths.Paths[routeProperties.Path]
@@ -937,7 +943,7 @@ func convertFromSpecificToPrimitive(typeName string) (string, error) {
 func (parser *Parser) getTypeSchema(typeName string, file *ast.File, ref bool) (*spec.Schema, error) {
 	if override, ok := parser.Overrides[typeName]; ok {
 		parser.debug.Printf("Override detected for %s: using %s instead", typeName, override)
-		typeName = override
+		return parseObjectSchema(parser, override, file)
 	}
 
 	if IsInterfaceLike(typeName) {
@@ -952,7 +958,7 @@ func (parser *Parser) getTypeSchema(typeName string, file *ast.File, ref bool) (
 		return PrimitiveSchema(schemaType), nil
 	}
 
-	typeSpecDef := parser.packages.FindTypeSpec(typeName, file, parser.ParseDependency)
+	typeSpecDef := parser.packages.FindTypeSpec(typeName, file)
 	if typeSpecDef == nil {
 		return nil, fmt.Errorf("cannot find type definition: %s", typeName)
 	}
@@ -1079,9 +1085,7 @@ func (parser *Parser) isInStructStack(typeSpecDef *TypeSpecDef) bool {
 // given name and package, and populates swagger schema definitions registry
 // with a schema for the given type
 func (parser *Parser) ParseDefinition(typeSpecDef *TypeSpecDef) (*Schema, error) {
-	typeName := typeSpecDef.FullName()
-	refTypeName := TypeDocName(typeName, typeSpecDef.TypeSpec)
-
+	typeName := typeSpecDef.TypeName()
 	schema, found := parser.parsedSchemas[typeSpecDef]
 	if found {
 		parser.debug.Printf("Skipping '%s', already parsed.", typeName)
@@ -1093,7 +1097,7 @@ func (parser *Parser) ParseDefinition(typeSpecDef *TypeSpecDef) (*Schema, error)
 		parser.debug.Printf("Skipping '%s', recursion detected.", typeName)
 
 		return &Schema{
-				Name:    refTypeName,
+				Name:    typeName,
 				PkgPath: typeSpecDef.PkgPath,
 				Schema:  PrimitiveSchema(OBJECT),
 			},
@@ -1113,8 +1117,27 @@ func (parser *Parser) ParseDefinition(typeSpecDef *TypeSpecDef) (*Schema, error)
 		fillDefinitionDescription(definition, typeSpecDef.File, typeSpecDef)
 	}
 
+	if len(typeSpecDef.Enums) > 0 {
+		var varnames []string
+		var enumComments = make(map[string]string)
+		for _, value := range typeSpecDef.Enums {
+			definition.Enum = append(definition.Enum, value.Value)
+			varnames = append(varnames, value.key)
+			if len(value.Comment) > 0 {
+				enumComments[value.key] = value.Comment
+			}
+		}
+		if definition.Extensions == nil {
+			definition.Extensions = make(spec.Extensions)
+		}
+		definition.Extensions[enumVarNamesExtension] = varnames
+		if len(enumComments) > 0 {
+			definition.Extensions[enumCommentsExtension] = enumComments
+		}
+	}
+
 	sch := Schema{
-		Name:    refTypeName,
+		Name:    typeName,
 		PkgPath: typeSpecDef.PkgPath,
 		Schema:  definition,
 	}
@@ -1129,9 +1152,13 @@ func (parser *Parser) ParseDefinition(typeSpecDef *TypeSpecDef) (*Schema, error)
 	return &sch, nil
 }
 
-func fullTypeName(pkgName, typeName string) string {
+func fullTypeName(parts ...string) string {
+	return strings.Join(parts, ".")
+}
+
+func fullTypeNameFunctionScoped(pkgName, fnName, typeName string) string {
 	if pkgName != "" {
-		return pkgName + "." + typeName
+		return pkgName + "." + fnName + "." + typeName
 	}
 
 	return typeName
@@ -1237,12 +1264,10 @@ func (parser *Parser) parseTypeExpr(file *ast.File, typeExpr ast.Expr, ref bool)
 
 	case *ast.FuncType:
 		return nil, ErrFuncTypeField
-	// ...
-	default:
-		parser.debug.Printf("Type definition of type '%T' is not supported yet. Using 'object' instead.\n", typeExpr)
+		// ...
 	}
 
-	return PrimitiveSchema(OBJECT), nil
+	return parser.parseGenericTypeExpr(file, typeExpr)
 }
 
 func (parser *Parser) parseStruct(file *ast.File, fields *ast.FieldList) (*spec.Schema, error) {
@@ -1289,7 +1314,7 @@ func (parser *Parser) parseStructField(file *ast.File, field *ast.Field) (map[st
 			}
 		}
 
-		typeName, err := getFieldType(field.Type)
+		typeName, err := getFieldType(file, field.Type)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1333,7 +1358,7 @@ func (parser *Parser) parseStructField(file *ast.File, field *ast.Field) (map[st
 	}
 
 	if schema == nil {
-		typeName, err := getFieldType(field.Type)
+		typeName, err := getFieldType(file, field.Type)
 		if err == nil {
 			// named type
 			schema, err = parser.getTypeSchema(typeName, file, true)
@@ -1366,26 +1391,26 @@ func (parser *Parser) parseStructField(file *ast.File, field *ast.Field) (map[st
 	return map[string]spec.Schema{fieldName: *schema}, tagRequired, nil
 }
 
-func getFieldType(field ast.Expr) (string, error) {
+func getFieldType(file *ast.File, field ast.Expr) (string, error) {
 	switch fieldType := field.(type) {
 	case *ast.Ident:
 		return fieldType.Name, nil
 	case *ast.SelectorExpr:
-		packageName, err := getFieldType(fieldType.X)
+		packageName, err := getFieldType(file, fieldType.X)
 		if err != nil {
 			return "", err
 		}
 
 		return fullTypeName(packageName, fieldType.Sel.Name), nil
 	case *ast.StarExpr:
-		fullName, err := getFieldType(fieldType.X)
+		fullName, err := getFieldType(file, fieldType.X)
 		if err != nil {
 			return "", err
 		}
 
 		return fullName, nil
 	default:
-		return "", fmt.Errorf("unknown field type %#v", field)
+		return getGenericFieldType(file, field, nil)
 	}
 }
 

@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/swaggo/swag/testdata/generics_basic/api"
+	"github.com/swaggo/swag/testdata/generics_arrays/api"
 )
 
 // @title Swagger Example API
@@ -12,6 +12,8 @@ import (
 // @host localhost:4000
 // @basePath /api
 func main() {
-	http.HandleFunc("/posts/", api.GetPost)
+	http.HandleFunc("/posts/", api.GetPosts)
+	http.HandleFunc("/posts-multi/", api.GetPostMulti)
+	http.HandleFunc("/posts-multis/", api.GetPostArray)
 	http.ListenAndServe(":8080", nil)
 }

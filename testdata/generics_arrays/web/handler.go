@@ -4,6 +4,15 @@ import (
 	"time"
 )
 
+type GenericListBody[T any] struct {
+	Data []T
+}
+
+type GenericListBodyMulti[T any, X any] struct {
+	Data []T
+	Meta []X
+}
+
 // GenericListResponse[T]
 // @Description Some Generic List Response
 type GenericListResponse[T any] struct {
@@ -23,17 +32,6 @@ type GenericListResponseMulti[T any, X any] struct {
 
 	// Status of the things
 	Status string
-}
-
-type Post struct {
-	ID int `json:"id" example:"1" format:"int64"`
-	// Post name
-	Name string `json:"name" example:"poti"`
-	// Post data
-	Data struct {
-		// Post tag
-		Tag []string `json:"name"`
-	} `json:"data"`
 }
 
 // APIError

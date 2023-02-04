@@ -269,6 +269,10 @@ func pathExists(path string) (bool, error) {
 }
 
 func GetPackageName(searchDir string) (string, error) {
+	s, exists := PkgNameMap[searchDir]
+	if exists {
+		return s, nil
+	}
 	cmd := exec.Command("go", "list", "-f={{.ImportPath}}")
 	cmd.Dir = searchDir
 
@@ -290,6 +294,6 @@ func GetPackageName(searchDir string) (string, error) {
 	f := strings.Split(outStr, "\n")
 
 	outStr = f[0]
-
+	PkgNameMap[searchDir] = outStr
 	return outStr, nil
 }

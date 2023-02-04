@@ -80,6 +80,8 @@ var (
 
 	// ErrSkippedField .swaggo specifies field should be skipped.
 	ErrSkippedField = errors.New("field is skipped by global overrides")
+
+	PkgNameMap = make(map[string]string)
 )
 
 var allMethod = map[string]struct{}{
@@ -391,6 +393,10 @@ func (parser *Parser) ParseAPIMultiSearchDir(searchDirs []string, mainAPIFile st
 }
 
 func getPkgName(searchDir string) (string, error) {
+	s, exists := PkgNameMap[searchDir]
+	if exists {
+		return s, nil
+	}
 	cmd := exec.Command("go", "list", "-f={{.ImportPath}}")
 	cmd.Dir = searchDir
 
@@ -412,7 +418,7 @@ func getPkgName(searchDir string) (string, error) {
 	f := strings.Split(outStr, "\n")
 
 	outStr = f[0]
-
+	PkgNameMap[searchDir] = outStr
 	return outStr, nil
 }
 

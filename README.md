@@ -28,12 +28,12 @@ swag-gin init --aco=true --ag=true
 
 ```go
 func InitPublicRouter(r *gin.RouterGroup) {
-r.GET("/testapi/get-string-by-int2/{some_id}", api.GetStringByInt2)
+    r.GET("/testapi/get-string-by-int2/{some_id}", api.GetStringByInt2)
 }
 
 func InitPrivateRouter(r *gin.RouterGroup) {
-r.GET("/testapi/get-string-by-int/{some_id}", api.GetStringByInt)
-r.POST("/testapi/get-string-by-int3/{some_id}", api.GetStringByInt3)
+    r.GET("/testapi/get-string-by-int/{some_id}", api.GetStringByInt)
+    r.POST("/testapi/get-string-by-int3/{some_id}", api.GetStringByInt3)
 }
 ```
 
